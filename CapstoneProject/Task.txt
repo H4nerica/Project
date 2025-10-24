@@ -1,0 +1,8 @@
+Function :
+1. Scanning either qr or custom code 
+2. Can read the code
+3. Add savefile like json
+4. Read and write saves file
+5. Assign data from the json correctly with id of either qr or custom code
+6. Adding scan ui(info and scan button)
+7. Adding info ui(save, remove, and "x" button)
