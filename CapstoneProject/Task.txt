@@ -9,10 +9,12 @@ Function :
 8. Ar object in realworl with the data
 
 Ui/Ux :
-1. Font change to like the one in android studio code editor or https://www.jetbrains.com/lp/mono/
+1. Font change to like the one in android studio code editor or https://www.jetbrains.com/lp/mono/ .
 2. Home menu which contain (scan option qr or custom code).
 3. Ar panel looks ugly maybe dark theme with blured background like the one on win11 taskbar.
 4. Info ui form looks ugly maybe dark theme with simple layout with slick design.
+5. Maybe simple transition between menu and ui.
+6. Button looks ugly and barebone maybe made it have smooth corner and instead of text maybe use svg as icon.
 
 Bugs :
 1. Currently Ar panel only update after pressing scan button. and not automatically after either save or "x" in info ui.
