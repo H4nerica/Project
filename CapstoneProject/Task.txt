@@ -1,8 +1,19 @@
 Function :
 1. Scanning either qr or custom code 
 2. Can read the code
-3. Add savefile like json
+3. Add savefile like json with the database
 4. Read and write saves file
 5. Assign data from the json correctly with id of either qr or custom code
 6. Adding scan ui(info and scan button)
 7. Adding info ui(save, remove, and "x" button)
+8. Ar object in realworl with the data
+
+Ui/Ux :
+1. Font change to like the one in android studio code editor or https://www.jetbrains.com/lp/mono/
+2. Home menu which contain (scan option qr or custom code).
+3. Ar panel looks ugly maybe dark theme with blured background like the one on win11 taskbar.
+4. Info ui form looks ugly maybe dark theme with simple layout with slick design.
+
+Bugs :
+1. Currently Ar panel only update after pressing scan button. and not automatically after either save or "x" in info ui.
+
