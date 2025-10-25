@@ -7,6 +7,7 @@ Function :
 6. Adding scan ui(info and scan button)
 7. Adding info ui(save, remove, and "x" button)
 8. Ar object in realworl with the data
+9. (optional) Maybe Make the scaning automatically with 5s delay.
 
 Ui/Ux :
 1. Font change to like the one in android studio code editor or https://www.jetbrains.com/lp/mono/ .
