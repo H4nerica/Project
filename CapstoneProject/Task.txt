@@ -10,7 +10,7 @@ Function:
 9. (Optional) Maybe make the scanning automatically with 5s delay - Not Done (still manual only)
 
 UI/UX:
-1. Font change to like Android Studio / JetBrains Mono - Not Done (default Unity font still used)
+1. Font change to like Android Studio / JetBrains Mono - Done (default now using jetbrains mono font)
 2. Home menu which contains scan option QR or custom code - Not Done (no home menu implemented)
 3. AR panel looks ugly, maybe dark theme with blurred background like Win11 taskbar - Not Done (plain UI, no blur/dark theme)
 4. Info UI form looks ugly, maybe dark theme with simple layout & slick design - Not Done (buttons and form are barebone)
