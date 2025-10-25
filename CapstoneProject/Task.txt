@@ -1,22 +1,21 @@
-Function :
-1. Scanning either qr or custom code 
-2. Can read the code
-3. Add savefile like json with the database
-4. Read and write saves file
-5. Assign data from the json correctly with id of either qr or custom code
-6. Adding scan ui(info and scan button)
-7. Adding info ui(save, remove, and "x" button)
-8. Ar object in realworl with the data
-9. (optional) Maybe Make the scaning automatically with 5s delay.
+Function:
+1. Scanning either QR or custom code - Partially Done (only custom grid scanning works; QR not integrated yet)
+2. Can read the code - Done (grid-to-ID parsing works correctly)
+3. Add savefile like JSON with the database - Done (JSON save file exists and works on PC & mobile)
+4. Read and write saves file - Done (can save, remove, and read correctly)
+5. Assign data from the JSON correctly with ID of either QR or custom code - Done (ID mapping works)
+6. Adding scan UI (info and scan button) - Done (UI exists but styling is basic)
+7. Adding info UI (save, remove, and "x" button) - Done (functionality works; buttons work)
+8. AR object in real world with the data - Partially Done (spawns correctly but only updates on manual scan)
+9. (Optional) Maybe make the scanning automatically with 5s delay - Not Done (still manual only)
 
-Ui/Ux :
-1. Font change to like the one in android studio code editor or https://www.jetbrains.com/lp/mono/ .
-2. Home menu which contain (scan option qr or custom code).
-3. Ar panel looks ugly maybe dark theme with blured background like the one on win11 taskbar.
-4. Info ui form looks ugly maybe dark theme with simple layout with slick design.
-5. Maybe simple transition between menu and ui.
-6. Button looks ugly and barebone maybe made it have smooth corner and instead of text maybe use svg as icon.
+UI/UX:
+1. Font change to like Android Studio / JetBrains Mono - Not Done (default Unity font still used)
+2. Home menu which contains scan option QR or custom code - Not Done (no home menu implemented)
+3. AR panel looks ugly, maybe dark theme with blurred background like Win11 taskbar - Not Done (plain UI, no blur/dark theme)
+4. Info UI form looks ugly, maybe dark theme with simple layout & slick design - Not Done (buttons and form are barebone)
+5. Maybe simple transition between menu and UI - Not Done (no transition yet)
+6. Button looks ugly and barebone, maybe smooth corners and SVG icons instead of text - Not Done (still basic Unity buttons)
 
-Bugs :
-1. Currently Ar panel only update after pressing scan button. and not automatically after either save or "x" in info ui.
-
+Bugs:
+1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - Not Done / Partially (manual update works but auto-update not implemented)
