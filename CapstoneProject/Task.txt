@@ -8,6 +8,8 @@ Function:
 7. Adding info UI (save, remove, and "x" button) - Done (functionality works; buttons work)
 8. AR object in real world with the data - Partially Done (spawns correctly but only updates on manual scan)
 9. (Optional) Maybe make the scanning automatically with 5s delay - Not Done (still manual only)
+10. The scanarea(gameobject) make it follow the marker but it still ui not in world space. (scanarea follow marker but the scan is still not yet completed).
+
 
 UI/UX:
 1. Font change to like Android Studio / JetBrains Mono - Done (default now using jetbrains mono font)
