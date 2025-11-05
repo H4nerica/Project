@@ -18,6 +18,7 @@ UI/UX:
 4. Info UI form looks ugly, maybe dark theme with simple layout & slick design - Not Done (buttons and form are barebone)
 5. Maybe simple transition between menu and UI - Not Done (no transition yet)
 6. Button looks ugly and barebone, maybe smooth corners and SVG icons instead of text - Not Done (still basic Unity buttons)
+7. Adding status bar on top middle, show the status of the app either the id or the code. 
 
 Bugs:
 1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - Not Done / Partially (manual update works but auto-update not implemented)
