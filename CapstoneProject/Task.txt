@@ -9,7 +9,7 @@ Function:
 8. AR object in real world with the data - Partially Done (spawns correctly but only updates on manual scan)
 9. (Optional) Maybe make the scanning automatically with 5s delay - Not Done (still manual only)
 10. The scanarea(gameobject) make it follow the marker but it still ui not in world space. (scanarea follow marker but the scan is still not yet completed).
-11. Expiry input have 3 form, and it jump beetween form after each input. When saving automatically added "-".
+11. Expiry input have 3 form, and it jump beetween form after each input. When saving automatically added "-". - DONE
 
 
 UI/UX:
@@ -20,6 +20,7 @@ UI/UX:
 5. Maybe simple transition between menu and UI - Not Done (no transition yet)
 6. Button looks ugly and barebone, maybe smooth corners and SVG icons instead of text - Not Done (still basic Unity buttons)
 7. Adding status bar on top middle, show the status of the app either the id or the code. 
+8. Expiry input ui form will called numpad instead of keyboard on mobile. - DONE
 
 Bugs:
 1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - Not Done / Partially (manual update works but auto-update not implemented).
