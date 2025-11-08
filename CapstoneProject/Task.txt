@@ -21,7 +21,7 @@ UI/UX:
 6. Button looks ugly and barebone, maybe smooth corners and SVG icons instead of text - Not Done (still basic Unity buttons)
 7. Adding status bar on top middle, show the status of the app either the id or the code. 
 8. Expiry input ui form will called numpad instead of keyboard on mobile. - DONE
-9. Name text will not overflow but instead put (...) example "Bakso bak..." - DONE
+9. Name/Tag text will not overflow but instead put (...) example "Bakso bak..." - DONE
 
 Bugs:
 1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - Not Done / Partially (manual update works but auto-update not implemented).
