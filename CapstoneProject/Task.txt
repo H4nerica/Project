@@ -25,5 +25,5 @@ UI/UX:
 10. Ui is being updated to look good instead of placeholder. - DONE
 
 Bugs:
-1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - Not Done / Partially (manual update works but auto-update not implemented).
+1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - DONE (Scana every 1s)
 2. Save file json only being saved and work after restart on pc but on mobile not saved after exiting the app. - DONE
