@@ -15,10 +15,10 @@ Function:
 UI/UX:
 1. Font change to like Android Studio / JetBrains Mono - Done (default now using jetbrains mono font)
 2. Home menu which contains scan option QR or custom code - Not Done (no home menu implemented)
-3. AR panel looks ugly, maybe dark theme with blurred background like Win11 taskbar - Not Done (plain UI, no blur/dark theme)
-4. Info UI form looks ugly, maybe dark theme with simple layout & slick design - Not Done (buttons and form are barebone)
+3. AR panel looks ugly, maybe dark theme with blurred background like Win11 taskbar - DONE 
+4. Info UI form looks ugly, maybe dark theme with simple layout & slick design - DONE 
 5. Maybe simple transition between menu and UI - Not Done (no transition yet)
-6. Button looks ugly and barebone, maybe smooth corners and SVG icons instead of text - Not Done (still basic Unity buttons)
+6. Button looks ugly and barebone, maybe smooth corners and SVG icons instead of text - DONE
 7. Adding status bar on top middle, show the status of the app either the id or the code. 
 8. Expiry input ui form will called numpad instead of keyboard on mobile. - DONE
 9. Name/Tag text will not overflow but instead put (...) example "Bakso bak..." - DONE
