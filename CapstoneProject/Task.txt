@@ -27,3 +27,7 @@ UI/UX:
 Bugs:
 1. Currently AR panel only updates after pressing scan button and not automatically after save or "x" in info UI - DONE (Scana every 1s)
 2. Save file json only being saved and work after restart on pc but on mobile not saved after exiting the app. - DONE
+
+
+Debug :
+1. Added hidden button on the left top corner of the editform, click it 3 times to toggle the scanarea show/hide.
