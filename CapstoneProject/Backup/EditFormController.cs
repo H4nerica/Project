@@ -1,122 +1,187 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.Networking;
 using TMPro;
+using System.IO;
 
-public class EditFormController : MonoBehaviour
+[System.Serializable]
+public class ItemData
+{
+    public string id;
+    public string name;
+    public string expireIn;
+    public string tag;
+}
+
+[System.Serializable]
+public class ItemDataList
+{
+    public ItemData[] items;
+}
+
+public class ItemInfoManager : MonoBehaviour
 {
     [Header("UI References")]
-    public TMP_InputField nameInput;
-    public ExpiryDateInputs expiryInputs; // dd / mm / yyyy
-    public TMP_InputField tagInput;
-    public Button saveButton;
-    public Button removeButton;
+    public GameObject infoPanel;
+    public TextMeshProUGUI TMPName;
+    public TextMeshProUGUI TMPExpire;
+    public TextMeshProUGUI TMPTags;
+    public TextMeshProUGUI TMPHint;
 
-    [Header("Data Manager")]
-    public ItemInfoManager infoManager;
+    [Header("Days Left Reference")]
+    public DaysLeft daysLeft;  // assign in inspector
 
-    [Header("Overlay Canvas")]
-    public GameObject overlayEdit; // assign the canvas here
+    [Header("Data")]
+    public List<ItemData> items = new List<ItemData>();
 
-    private string lockedID;
+    private string savePath;
 
-    private void Start()
+    void Start()
     {
-        if (saveButton != null)
-            saveButton.onClick.AddListener(OnSaveClicked);
+        if (infoPanel != null)
+            infoPanel.SetActive(false);
 
-        if (removeButton != null)
-            removeButton.onClick.AddListener(OnRemoveClicked);
-    }
+        savePath = Path.Combine(Application.persistentDataPath, "Items.json");
+        string defaultPath = Path.Combine(Application.streamingAssetsPath, "Items.json");
 
-    private void Update()
-    {
-        if (overlayEdit == null) return;
-
-        // Unlock ID and clear form when overlay hides
-        if (!overlayEdit.activeSelf && !string.IsNullOrEmpty(lockedID))
+        // ✅ Only copy the default JSON once (first launch only)
+        if (!File.Exists(savePath))
         {
-            UnlockID();
-            ClearInputs();
-        }
-    }
-
-    public void PopulateFormFields(string id)
-    {
-        if (string.IsNullOrEmpty(id) || infoManager == null) return;
-
-        ItemData item = infoManager.GetItemByID(id);
-        if (item == null)
-        {
-            ClearInputs();
-            return;
+            if (File.Exists(defaultPath))
+            {
+                File.Copy(defaultPath, savePath);
+                Debug.Log("[ItemInfoManager] Default Items.json copied to persistentDataPath");
+            }
+            else
+            {
+                Debug.LogWarning("[ItemInfoManager] Default JSON not found in StreamingAssets!");
+                File.WriteAllText(savePath, JsonUtility.ToJson(new ItemDataList { items = new ItemData[0] }, true));
+            }
         }
 
-        nameInput.text = item.name;
-        tagInput.text = item.tag;
+        // ✅ Always load from the persistent save file
+        LoadItemsJson();
+    }
 
-        if (!string.IsNullOrEmpty(item.expireIn) && item.expireIn.Length == 10)
+    // 🔹 Read JSON directly from persistent path (no web request)
+    private void LoadItemsJson()
+    {
+        if (File.Exists(savePath))
         {
-            expiryInputs.dayInput.text   = item.expireIn.Substring(0, 2);
-            expiryInputs.monthInput.text = item.expireIn.Substring(3, 2);
-            expiryInputs.yearInput.text  = item.expireIn.Substring(6, 4);
+            try
+            {
+                string json = File.ReadAllText(savePath);
+                ItemDataList dataList = JsonUtility.FromJson<ItemDataList>(json);
+
+                if (dataList != null && dataList.items != null)
+                {
+                    items = new List<ItemData>(dataList.items);
+                    Debug.Log($"✅ Loaded {items.Count} items from JSON.");
+                }
+                else
+                {
+                    items = new List<ItemData>();
+                    Debug.LogWarning("⚠️ JSON loaded but contains no valid items.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("❌ Failed to read JSON: " + ex.Message);
+                items = new List<ItemData>();
+            }
         }
         else
         {
-            expiryInputs.dayInput.text   = "";
-            expiryInputs.monthInput.text = "";
-            expiryInputs.yearInput.text  = "";
+            items = new List<ItemData>();
+            Debug.LogWarning("⚠️ No save file found at " + savePath);
         }
     }
 
-    private void OnSaveClicked()
+    public void ShowItemInfo(string scannedID)
     {
-        if (string.IsNullOrEmpty(lockedID)) return;
-
-        string date = expiryInputs.GetFullDate();
-        if (string.IsNullOrEmpty(date) || date == "--") date = "";
-
-        ItemData data = new ItemData
+        if (string.IsNullOrEmpty(scannedID))
         {
-            id = lockedID,
-            name = nameInput.text,
-            expireIn = date,
-            tag = tagInput.text
-        };
+            if (infoPanel != null)
+                infoPanel.SetActive(false);
+            return;
+        }
 
-        if (infoManager != null)
+        ItemData data = GetItemByID(scannedID);
+
+        if (data != null)
         {
-            infoManager.SaveItemInfo(data);
-            infoManager.ShowItemInfo(lockedID);
+            infoPanel.SetActive(true);
+            TMPName.text = string.IsNullOrEmpty(data.name) ? "Unnamed Item" : data.name;
+            TMPExpire.text = string.IsNullOrEmpty(data.expireIn) ? "No Expiry" : data.expireIn;
+
+            // <-- DaysLeft hookup
+            if (daysLeft != null && !string.IsNullOrEmpty(data.expireIn))
+                daysLeft.SetExpiry(data.expireIn);
+
+            TMPTags.text = string.IsNullOrEmpty(data.tag) ? "No Tag" : data.tag;
+        }
+        else
+        {
+            if (infoPanel != null)
+            {
+                infoPanel.SetActive(true);
+                TMPName.text = "No Data Found";
+                TMPExpire.text = "-";
+                TMPTags.text = "-";
+            }
         }
     }
 
-    private void OnRemoveClicked()
+    public ItemData GetItemByID(string id)
     {
-        if (string.IsNullOrEmpty(lockedID)) return;
-        ClearInputs();
+        if (items == null) return null;
+        return items.Find(x => x.id == id);
     }
 
-    private void UnlockID()
+    public void SaveItemInfo(ItemData updatedItem)
     {
-        lockedID = null;
+        if (items == null || updatedItem == null) return;
+
+        int index = items.FindIndex(x => x.id == updatedItem.id);
+        if (index >= 0)
+            items[index] = updatedItem;
+        else
+            items.Add(updatedItem);
+
+        SaveToJson();
     }
 
-    private void ClearInputs()
+    public void RemoveItemInfo(string id)
     {
-        nameInput.text = "";
-        expiryInputs.dayInput.text = "";
-        expiryInputs.monthInput.text = "";
-        expiryInputs.yearInput.text = "";
-        tagInput.text = "";
+        if (items == null) return;
+
+        ItemData data = GetItemByID(id);
+        if (data != null)
+        {
+            data.name = "";
+            data.expireIn = "";
+            data.tag = "";
+        }
+
+        ShowDefaultPanel();
     }
 
-    // Force populate form on every scan
-public void LockAndPopulate(string id)
-{
-    if (string.IsNullOrEmpty(id) || infoManager == null) return;
+    private void SaveToJson()
+    {
+        ItemDataList wrapper = new ItemDataList { items = items.ToArray() };
+        string json = JsonUtility.ToJson(wrapper, true);
+        File.WriteAllText(savePath, json);
+        Debug.Log("💾 Saved changes to: " + savePath);
+    }
 
-    lockedID = id;          // lock current ID
-    PopulateFormFields(id); // always populate form
-}
+    public void ShowDefaultPanel()
+    {
+        if (infoPanel != null)
+            infoPanel.SetActive(true);
 
+        if (TMPName != null) TMPName.text = "Unknown Item";
+        if (TMPExpire != null) TMPExpire.text = "—";
+        if (TMPTags != null) TMPTags.text = "No Tag";
+    }
 }
