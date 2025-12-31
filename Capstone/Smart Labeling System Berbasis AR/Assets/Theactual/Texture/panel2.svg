@@ -1,0 +1,16 @@
+<svg width="174" height="80" viewBox="0 0 174 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- ORIGINAL BOX -->
+  <rect width="174" height="80" rx="4" fill="white"/>
+
+  <!-- BLACK BOX with only RIGHT corners rounded -->
+  <!-- width = 52.2, x = 121.8 -->
+  <path d="
+    M121.8 0
+    H170           
+    a4 4 0 0 1 4 4
+    V76
+    a4 4 0 0 1 -4 4
+    H121.8
+    Z
+  " fill="black"/>
+</svg>
