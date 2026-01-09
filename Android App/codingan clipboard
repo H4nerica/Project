@@ -1,0 +1,31 @@
+// ---------------- UPLOAD IMAGE AS BASE64 ----------------
+private fun uploadProfileImageToDatabase(
+    uri: Uri,
+    context: android.content.Context,
+    profileRef: com.google.firebase.database.DatabaseReference,
+    onComplete: (String) -> Unit
+) {
+    val inputStream = context.contentResolver.openInputStream(uri)
+    val bytes = inputStream?.readBytes()
+    inputStream?.close()
+    if (bytes != null) {
+        val base64 = Base64.encodeToString(bytes, Base64.DEFAULT)
+        profileRef.child("imageBase64").setValue(base64)
+        onComplete(base64)
+    }
+}
+
+// ---------------- LOAD BITMAP FROM BASE64 ----------------
+@Composable
+fun loadBitmapFromBase64(base64: String): android.graphics.Bitmap? {
+    var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(base64) {
+        try {
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (_: Exception) {
+            bitmap = null
+        }
+    }
+    return bitmap
+}
