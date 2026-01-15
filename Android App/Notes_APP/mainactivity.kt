@@ -1,0 +1,67 @@
+package com.project.pertemuan3
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.project.pertemuan3.ui.theme.Pertemuan3Theme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            Pertemuan3Theme {
+
+                val nav = rememberNavController()
+
+                NavHost(
+                    navController = nav,
+                    startDestination = "mainMenu"
+                ) {
+
+                    composable("mainMenu") {
+                        MainMenuScreen(
+                            onLogin = { nav.navigate("login") },
+                            onRegister = { nav.navigate("register") }
+                        )
+                    }
+
+                    composable("login") {
+                        LoginScreen(
+                            onLoginSuccess = { email ->
+                                CurrentUser.email = email
+                                nav.navigate("appMain") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    composable("register") {
+                        RegisterScreen(
+                            onRegisterSuccess = { email ->
+                                CurrentUser.email = email
+                                nav.navigate("appMain") {
+                                    popUpTo("register") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    composable("appMain") {
+
+                        // 🔒 BLOCK BACK BUTTON ON HOME / APP MAIN
+                        BackHandler(enabled = true) {
+                            // do nothing
+                        }
+
+                        AppMain(currentUserEmail = CurrentUser.email)
+                    }
+                }
+            }
+        }
+    }
+}
