@@ -1,0 +1,91 @@
+extends Control
+
+@onready var grid = $VBoxContainer/ScrollContainer/AlbumsGrid
+@onready var scan_btn = $VBoxContainer/ScanButton
+@onready var status_label = $VBoxContainer/StatusLabel   # ← Make sure you have a Label node with this exact name
+
+var albums: Array[String] = []
+
+func _ready():
+	if OS.get_name() == "Android":
+		var android = Engine.get_singleton("Android")
+		if android:
+			# Request normal media permission (easier, no greyed out)
+			android.request_permissions(["android.permission.READ_MEDIA_IMAGES"])
+	
+	scan_btn.pressed.connect(_on_scan_pressed)
+	
+	# Auto scan a bit after start
+	await get_tree().create_timer(0.8).timeout
+	_on_scan_pressed()
+
+func _on_scan_pressed():
+
+	
+	albums.clear()
+	for child in grid.get_children():
+		child.queue_free()
+	
+	status_label.text = "Scanning common image folders..."
+	
+	# Common folders that usually contain photos
+	var common_paths = [
+		"/storage/emulated/0/DCIM",
+		"C:/Users/H4NE-DESKTOP/Pictures/Wallpaper",
+		"/storage/emulated/0/Pictures",
+		"/storage/emulated/0/Download",
+		"/sdcard/DCIM",
+        "/sdcard/Pictures"
+	]
+	
+	for path in common_paths:
+		scan_root_path(path)
+	
+	display_albums()
+	status_label.text = "Scan finished. Albums found: " + str(albums.size())
+	if albums.is_empty():
+		status_label.text += "\nNo image folders found.\nTry granting READ_MEDIA_IMAGES permission."
+
+# ---------------- Scan one folder ----------------
+func scan_root_path(folder_path: String):
+	if not DirAccess.dir_exists_absolute(folder_path):
+		return
+	
+	if folder_has_image(folder_path):
+		albums.append(folder_path)
+		print("Album found: ", folder_path)
+
+func folder_has_image(folder_path: String) -> bool:
+	var dir = DirAccess.open(folder_path)
+	if dir == null:
+		return false
+	
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	while file_name != "":
+		if file_name != "." and file_name != ".." and not dir.current_is_dir():
+			if is_image(file_name):
+				dir.list_dir_end()
+				return true
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	return false
+
+func display_albums():
+	for album_path in albums:
+		var btn = Button.new()
+		btn.text = album_path.get_file()          # shows folder name only
+		btn.custom_minimum_size = Vector2(200, 200)
+		btn.pressed.connect(func(): open_album(album_path))
+		grid.add_child(btn)
+
+func open_album(album_path: String):
+	Event_Thing.selected_album = album_path
+	get_tree().change_scene_to_file("res://Scene/album_view.tscn")
+
+func is_image(file_name: String) -> bool:
+	var n = file_name.to_lower()
+	return n.ends_with(".jpg") or \
+		   n.ends_with(".jpeg") or \
+		   n.ends_with(".png") or \
+		   n.ends_with(".webp")
