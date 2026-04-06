@@ -1,0 +1,129 @@
+extends Control
+
+@onready var grid = $VBoxContainer/ScrollContainer/AlbumsGrid
+
+var current_album = ""
+var image_files: Array[String] = []
+var thumbs_ready = false
+
+# ─── Tap Tracking
+var selected_thumb_file: String = ""
+var drag_start_pos: Vector2 = Vector2.ZERO
+const DRAG_THRESHOLD = 12.0
+
+func _ready():
+	current_album = Event_Thing.selected_album
+	thumbs_ready = false
+	load_image_list()
+	await get_tree().process_frame
+	thumbs_ready = true
+	print("✅ THUMBS READY")
+	load_images_sequential()
+
+func _on_thumbnail_input(event: InputEvent, file_path: String):
+	if not thumbs_ready:
+		return
+
+	# TOUCH DOWN → remember start
+	if event is InputEventScreenTouch and event.pressed:
+		selected_thumb_file = file_path
+		drag_start_pos = event.position
+
+	# TOUCH UP → decide tap vs swipe
+	elif event is InputEventScreenTouch and not event.pressed:
+		var drag_distance = event.position.distance_to(drag_start_pos)
+
+		if selected_thumb_file == file_path and drag_distance < DRAG_THRESHOLD:
+			print("✅ TAP → OPEN", file_path.get_file())
+			open_fullscreen(file_path)
+		else:
+			print("❌ NOT TAP (moved:", drag_distance, ")")
+
+		selected_thumb_file = ""
+
+
+# ─── ORIGINAL FUNCTIONS
+
+func load_image_list():
+	image_files.clear()
+	if current_album == "":
+		return
+	
+	var dir = DirAccess.open(current_album)
+	if dir == null:
+		return
+
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	while file_name != "":
+		if file_name != "." and file_name != ".." and not dir.current_is_dir():
+			if is_image(file_name):
+				var full_path = current_album.path_join(file_name)
+				if FileAccess.file_exists(full_path):
+					image_files.append(full_path)
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	print("📁 Loaded", image_files.size(), "images")
+
+func load_images_sequential():
+	if image_files.is_empty():
+		return
+	load_next_image(0)
+
+func load_next_image(index: int):
+	if index >= image_files.size():
+		return
+	
+	var file_path = image_files[index]
+	create_image_item(file_path)
+	
+	await get_tree().create_timer(0.016).timeout
+	load_next_image(index + 1)
+
+func create_image_item(file_path: String):
+	var screen_width = get_viewport_rect().size.x
+	var thumb_size = int((screen_width - 15) / 4)
+	
+	var container = Control.new()
+	container.mouse_filter = Control.MOUSE_FILTER_PASS   # ✅ allow scroll + detect tap
+	container.custom_minimum_size = Vector2(thumb_size, thumb_size)
+	container.gui_input.connect(_on_thumbnail_input.bind(file_path))
+
+	var img = Image.new()
+	if img.load(file_path) != OK:
+		print("❌ Failed to load:", file_path)
+		return
+		
+	var crop_size = min(img.get_width(), img.get_height())
+	var square_img = img.get_region(Rect2(
+		(img.get_width() - crop_size) * 0.5,
+		(img.get_height() - crop_size) * 0.5,
+		crop_size,
+		crop_size
+	))
+
+	var tex = ImageTexture.create_from_image(square_img)
+	var tex_rect = TextureRect.new()
+	tex_rect.custom_minimum_size = Vector2(thumb_size, thumb_size)
+	tex_rect.anchors_preset = Control.PRESET_FULL_RECT
+	tex_rect.expand = true
+	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ✅ don't block input
+	tex_rect.texture = tex
+
+	container.add_child(tex_rect)
+	grid.add_child(container)
+
+func open_fullscreen(file_path: String):
+	print("🚀 Opening fullscreen:", file_path.get_file())
+	get_tree().change_scene_to_file("res://Scene/image_viewer.tscn")
+	Event_Thing.selected_image = file_path
+
+func is_image(file_name: String) -> bool:
+	var n = file_name.to_lower()
+	return n.ends_with(".jpg") or n.ends_with(".jpeg") or n.ends_with(".png") or n.ends_with(".webp")
+
+func _input(event):
+	if event.is_action_pressed("ui_cancel"):  # Back button
+		print("📱 Back → Main menu")
+		get_tree().change_scene_to_file("res://Scene/main.tscn")  # Your main scene
