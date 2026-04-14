@@ -29,3 +29,83 @@ fun loadBitmapFromBase64(base64: String): android.graphics.Bitmap? {
     }
     return bitmap
 }
+
+//-----------------------------NOte app------------------------
+This is the leanest version possible. It uses a single script to handle the UI, the cloning of blocks, and the saving/loading logic.
+
+### 1. Scene Setup
+* **Main (Control)**
+	* **ScrollContainer** (Set to "Full Rect" layout)
+		* **VBoxContainer** (Name this `BlockContainer`)
+	* **TemplateBlock (Panel)** (Set `visible = false`, place a **TextEdit** and an **"X" Button** inside it)
+	* **AddButton (+)**
+	* **SaveButton (Save)**
+
+### 2. The Script
+Attach this to your **Main** node. It uses **tabs** for indentation.
+
+```gdscript
+extends Control
+
+@onready var container = $ScrollContainer/BlockContainer
+@onready var template = $TemplateBlock
+const FILE_PATH = "user://note.json"
+
+func _ready():
+	template.hide()
+	load_data()
+
+# --- BLOCK LOGIC ---
+
+func _on_add_button_pressed():
+	create_new_block("")
+
+func create_new_block(content: String):
+	var block = template.duplicate()
+	block.show()
+	container.add_child(block)
+	
+	# Set initial text (if loading)
+	var input = block.find_child("TextEdit")
+	input.text = content
+	
+	# Handle the X button to remove block
+	var x_btn = block.find_child("Button") # Point this to your "X" button
+	x_btn.pressed.connect(func(): block.queue_free())
+
+# --- STORAGE LOGIC ---
+
+func _on_save_button_pressed():
+	var save_list = []
+	for block in container.get_children():
+		var input = block.find_child("TextEdit")
+		if input:
+			save_list.append(input.text)
+	
+	var file = FileAccess.open(FILE_PATH, FileAccess.WRITE)
+	file.store_string(JSON.stringify(save_list))
+	file.close()
+	print("Note saved.")
+
+func load_data():
+	if not FileAccess.file_exists(FILE_PATH):
+		# Create one empty block if new user
+		create_new_block("")
+		return
+		
+	var file = FileAccess.open(FILE_PATH, FileAccess.READ)
+	var data = JSON.parse_string(file.get_as_text())
+	file.close()
+	
+	if data is Array:
+		for text in data:
+			create_new_block(text)
+```
+
+### 3. Implementation Details
+* **Indentation:** Uses tabs as requested.
+* **Automatic Load:** The `_ready()` function checks if a file exists. If it doesn't, it calls `create_new_block("")` so the user isn't staring at a blank screen.
+* **The "X" Button:** Inside the template, make sure your delete button is just named "Button" or update the `find_child("Button")` line to match its name.
+* **Android Path:** `user://` is the correct path for Android 13; it is private to your app, so no SAF or external permissions are needed for this specific text-saving feature.
+
+**Quick Tip:** Make sure your `TemplateBlock` has a `custom_minimum_size` (like Y = 200) so the `VBoxContainer` gives it actual height when it appears.
