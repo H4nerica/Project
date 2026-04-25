@@ -6,8 +6,10 @@ extends Node
 
 #put var here, if this is inside func it will reset each call. So put it global to remember
 var id = 10
-var is_clicked
+
+var latest_item_clicked
 var last_item_clicked
+var open_item_clicked
 var can_click = false
 
 var screen_size
@@ -21,7 +23,7 @@ func _ready() -> void:
 	scroll_height = $ScrollContainer.size.y
 	await get_tree().process_frame
 	load_notes()
-	$Debug/TextEdit.text_changed.connect(change_input)
+	
 	$Nav_Panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	$Nav_Panel/Delete_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	
@@ -31,7 +33,7 @@ func _process(delta: float) -> void:
 	keyboard_height_raw = DisplayServer.virtual_keyboard_get_height()
 	const KEYBOARD_SCALE = 0.338 # 250 / ~720 ≈ 0.3472.. or scroll height(i choose) / keyboard_height
 	var keyboard_result = keyboard_height_raw * KEYBOARD_SCALE
-
+	
 	scroll_height_changed = scroll_height - keyboard_result
 	#keyboard_result = $Debug/TextEdit use this to debug the scroll size.
 	$ScrollContainer.size.y = scroll_height_changed
@@ -49,74 +51,30 @@ func create_template():
 	duplicate_thing.placeholder_text = duplicate_thing.name
 	duplicate_thing.selecting_enabled = false
 	
-	#call _on_focus func then bind the object 
-	duplicate_thing.gui_input.connect(on_focus.bind(duplicate_thing))
 	return duplicate_thing #return duplicate_thing to be used on load_notes
 
-func on_focus(event, duplicate_thing):
-	if event is InputEventMouseMotion:
-		return
-	if event is InputEventScreenDrag:
-		return
-	if event is InputEventMouseButton and not event.pressed:
-		return
-	if event is InputEventScreenTouch and not event.pressed:
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		return
-	if (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.pressed):
-		is_clicked = duplicate_thing
-		last_item_clicked = duplicate_thing
-		
-	print(duplicate_thing, " REAL TOUCH/CLICK")
-	print(last_item_clicked, " last item")
-
 func change_input():
-	var text = $Debug/TextEdit.text.strip_edges().to_lower() #ignore space " enable"
+	#var text = $Debug/TextEdit.text.strip_edges().to_lower() #ignore space " enable" #for debug
 	for child in box.get_children():
-		if text == "enable":
-			child.focus_mode = Control.FOCUS_ALL
+
+		if can_click:
 			child.mouse_filter = Control.MOUSE_FILTER_PASS
+			child.focus_mode = Control.FOCUS_ALL
 			child.selecting_enabled = true
 		else:
-			child.mouse_filter = Control.MOUSE_FILTER_PASS
+			child.mouse_filter = Control.MOUSE_FILTER_IGNORE 
 			child.focus_mode = Control.FOCUS_NONE
 			child.selecting_enabled = false
 
-func debug_all_nodes():
-	print("---- FULL NODE TREE DEBUG START ----")
-	_debug_node(get_tree().current_scene, 0)
-	print("---- FULL NODE TREE DEBUG END ----")
-	
-func _debug_node(node, depth):
-	var indent = ""
-	for i in depth:
-		indent += "  "
-
-	print(indent + "NAME: " + node.name + "  TYPE: " + node.get_class())
-
-	if node is Control:
-		print(indent + "  focus_mode:", node.focus_mode)
-		print(indent + "  mouse_filter:", node.mouse_filter)
-
-	if "selecting_enabled" in node:
-		print(indent + "  selecting_enabled:", node.selecting_enabled)
-
-	for child in node.get_children():
-		_debug_node(child, depth + 1)
-		
-func _on_button_pressed() -> void:
-	create_template()
+func _on_add_button_pressed() -> void:
+	var new_block = create_template()
+	await get_tree().process_frame
+	new_block.grab_focus()
 
 func _on_delete_button_pressed() -> void:
-	print("DELETE CLICKED")
-	print("is_clicked:", is_clicked)
-	print("valid:", is_instance_valid(is_clicked))
-	if is_clicked == null:
-		return	#return here means like stop the func, so it does cause error
-	is_clicked.queue_free() #this delete this node AFTER it finished being used
+	if latest_item_clicked == null:
+		return
+	latest_item_clicked.queue_free() #this delete this node AFTER it finished being used
 	
 func _on_save_button_pressed() -> void:
 	save_notes()
@@ -163,31 +121,93 @@ func swiping(event):
 		is_pressed = true
 		start_position = event.position
 		is_dragging = false
+		
+		#see what object being clicked
+		var raything_position = event.position
+		for node in get_tree().get_nodes_in_group("blocks"):
+			if node.get_global_rect().has_point(raything_position):
+				last_item_clicked = node
+				can_click = false
+				change_input()
+				print(last_item_clicked, " on clicked")
+				break
+		
 	if event is InputEventMouseButton and event.pressed:
 		is_pressed = true
 		start_position = event.position
 		is_dragging = false
+		
+		#see what object being clicked
+		var raything_position = event.position
+		for node in get_tree().get_nodes_in_group("blocks"):
+			if node.get_global_rect().has_point(raything_position):
+				last_item_clicked = node
+				can_click = false
+				change_input()
+				print(last_item_clicked, " on clicked")
+				break
 
 	# DRAG (TOUCH)
 	if event is InputEventScreenDrag and is_pressed:
 		if event.position.distance_to(start_position) > DRAG_THRESHOLD:
 			is_dragging = true
+			
 		$ScrollContainer.scroll_vertical -= event.relative.y
 	# DRAG (MOUSE)
 	if event is InputEventMouseMotion and is_pressed and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		if event.position.distance_to(start_position) > DRAG_THRESHOLD:
 			is_dragging = true
+				
 		$ScrollContainer.scroll_vertical -= event.relative.y
 
 	# RELEASE
 	if event is InputEventScreenTouch and not event.pressed:
 		is_pressed = false
-	if not is_dragging and is_clicked != null and event is InputEventMouseMotion == false:
-		var focused = get_viewport().gui_get_focus_owner()
-		if focused and focused.is_in_group("blocks"):
-			is_clicked.grab_focus()
-	is_dragging = false
+		is_dragging = false
+		
+		for node in get_tree().get_nodes_in_group("blocks"):
+			var raything_position = event.position
+			if node.get_global_rect().has_point(raything_position):
+				latest_item_clicked = node
+				break
+				
+		print(latest_item_clicked, " on release")
+		if last_item_clicked != latest_item_clicked:
+			return
+		open_item_clicked = latest_item_clicked
+		can_click = true
+		change_input()
+		print("its the same item", open_item_clicked)
+		call_deferred("open", latest_item_clicked)
+			
 	if event is InputEventMouseButton and not event.pressed:
 		is_pressed = false
 		is_dragging = false
-	
+		
+		for node in get_tree().get_nodes_in_group("blocks"):
+			var raything_position = event.position
+			if node.get_global_rect().has_point(raything_position):
+				latest_item_clicked = node
+				break
+				
+		print(latest_item_clicked, " on release")
+		if last_item_clicked != latest_item_clicked:
+			return
+		open_item_clicked = latest_item_clicked
+		can_click = true
+		change_input()
+		print("its the same item", open_item_clicked)
+		call_deferred("open", latest_item_clicked)
+		
+#set focus on open or click
+func open(node):
+	if node == null:
+		return
+	if not is_instance_valid(node):
+		return
+
+	if node is CodeEdit:
+		if node.has_focus():
+			return
+		
+		node.grab_focus()
