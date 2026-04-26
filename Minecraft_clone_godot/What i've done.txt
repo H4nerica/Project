@@ -1,0 +1,23 @@
+1. You created a voxel chunk system using a 1D array to store 3D block data.
+
+2. You implemented block indexing with `x + y * sizeX + z * sizeX * sizeY`.
+
+3. You built basic block functions for setting and getting voxel data.
+
+4. You initialized chunks by filling the entire array with AIR blocks.
+
+5. You defined block types like AIR and DIRT for world representation.
+
+6. You built a face-direction system using 6 predefined cube faces.
+
+7. You implemented neighbor checking to decide if a face should be rendered.
+
+8. You converted voxel data into a mesh using SurfaceTool.
+
+9. You switched from cube-per-block rendering to face-culling rendering.
+
+10. You combined all visible faces into a single mesh per chunk.
+
+11. You added vertex colors per face for debugging and visualization.
+
+12. You established the full pipeline: blocks → faces → triangles → mesh.
