@@ -1,0 +1,199 @@
+extends Node3D
+
+#--------------------------------------------------------------
+# CHUNK
+var world_size_x = 10
+var world_size_y = 5
+var world_size_z = 10
+var chunks_to_generate = []
+var Chunk_SIZE = 16
+var current_chunk_index = 0
+
+
+#processing
+var thread = Thread.new()
+var thread_result = null
+var thread_done = false
+var is_generating = false
+#--------------------------------------------------------------
+# BLOCK ID
+const AIR = 0
+const DIRT = 1
+
+#--------------------------------------------------------------
+# MESH DATA
+var dirt_material := StandardMaterial3D.new()
+
+# 6 face directions
+const FACES = [
+   # +X
+   {"name": "right", "dir": Vector3(1,0,0), "verts": [
+      Vector3(1,0,0), Vector3(1,1,0), Vector3(1,1,1), Vector3(1,0,1)
+   ]},
+
+   # -X
+   {"name": "left", "dir": Vector3(-1,0,0), "verts": [
+      Vector3(0,0,1), Vector3(0,1,1), Vector3(0,1,0), Vector3(0,0,0)
+   ]},
+
+   # +Y (TOP)
+   {"name": "top", "dir": Vector3(0,1,0), "verts": [
+      Vector3(0,1,0), Vector3(0,1,1), Vector3(1,1,1), Vector3(1,1,0)
+   ]},
+
+   # -Y (BOTTOM)
+   {"name": "bottom", "dir": Vector3(0,-1,0), "verts": [
+      Vector3(0,0,1), Vector3(0,0,0), Vector3(1,0,0), Vector3(1,0,1)
+   ]},
+
+   # +Z (FRONT)
+   {"name": "front", "dir": Vector3(0,0,1), "verts": [
+      Vector3(0,0,1), Vector3(1,0,1), Vector3(1,1,1), Vector3(0,1,1)
+   ]},
+
+   # -Z (BACK)
+   {"name": "back", "dir": Vector3(0,0,-1), "verts": [
+      Vector3(1,0,0), Vector3(0,0,0), Vector3(0,1,0), Vector3(1,1,0)
+   ]},
+]
+
+#--------------------------------------------------------------
+#update once on start
+func _ready():
+   texture() #give texture
+
+   for z in range(world_size_z):
+      for y in range(world_size_y):
+         for x in range(world_size_x):
+            chunks_to_generate.append(Vector3(x, y, z))
+            
+#--------------------------------------------------------------
+#update per frame
+func _process(delta):
+   var chunks_per_frame = 1
+
+   if is_generating:
+      return
+
+   if current_chunk_index >= chunks_to_generate.size():
+      return
+
+   var chunk_pos = chunks_to_generate[current_chunk_index]
+   is_generating = true
+   generate_one_chunk(chunk_pos)
+   current_chunk_index += 1
+      
+#--------------------------------------------------------------
+# CHUNK DATA
+func generate_one_chunk(chunk_pos):
+
+   var chunk = Node3D.new()
+   add_child(chunk)
+   chunk.position = chunk_pos * Chunk_SIZE
+
+   # block data (same as before)
+   var block_position_index = []
+   var size = Chunk_SIZE * Chunk_SIZE * Chunk_SIZE
+   block_position_index.resize(size)
+
+   for z in range(Chunk_SIZE):
+      for y in range(Chunk_SIZE):
+         for x in range(Chunk_SIZE):
+            var i = x + y * Chunk_SIZE + z * Chunk_SIZE * Chunk_SIZE
+            block_position_index[i] = DIRT
+
+   # -------------------------------
+   # START THREAD
+   thread_done = false
+   thread = Thread.new()
+   thread.start(_generate_chunk_mesh.bind(block_position_index))
+
+   # WAIT until done (non-blocking)
+   while not thread_done:
+      await get_tree().process_frame
+   thread.wait_to_finish()
+
+   # -------------------------------
+   # BACK TO MAIN THREAD
+
+   var st = thread_result
+
+   var mesh = st.commit()
+   var mi = MeshInstance3D.new()
+   mi.mesh = mesh
+
+   chunk.add_child(mi)
+   is_generating = false
+   
+func get_block_chunk(x, y, z, data):
+   if x < 0 or y < 0 or z < 0:
+      return AIR
+   if x >= Chunk_SIZE or y >= Chunk_SIZE or z >= Chunk_SIZE:
+      return AIR
+
+   var i = x + y * Chunk_SIZE + z * Chunk_SIZE * Chunk_SIZE
+   return data[i]
+
+func _generate_chunk_mesh(data):
+
+   var st = SurfaceTool.new()
+   st.begin(Mesh.PRIMITIVE_TRIANGLES)
+   st.set_material(dirt_material)
+
+   for z in range(Chunk_SIZE):
+      for y in range(Chunk_SIZE):
+         for x in range(Chunk_SIZE):
+
+            var i = x + y * Chunk_SIZE + z * Chunk_SIZE * Chunk_SIZE
+            if data[i] == AIR:
+               continue
+
+            _build_cube_chunk(st, x, y, z, data)
+
+   thread_result = st
+   thread_done = true
+   
+#--------------------------------------------------------------
+# MESH GENERATION
+func _build_cube_chunk(st, x, y, z, data):
+   for face in FACES:
+      var direction = face.dir
+
+      var nx = x + int(direction.x)
+      var ny = y + int(direction.y)
+      var nz = z + int(direction.z)
+
+      if get_block_chunk(nx, ny, nz, data) != AIR:
+         continue
+
+      var face_color = FACE_COLORS[face.name]
+      var v = face.verts
+
+      var v0 = Vector3(x, y, z) + v[0]
+      var v1 = Vector3(x, y, z) + v[1]
+      var v2 = Vector3(x, y, z) + v[2]
+      var v3 = Vector3(x, y, z) + v[3]
+
+      st.set_color(face_color)
+
+      st.add_vertex(v0)
+      st.add_vertex(v2)
+      st.add_vertex(v1)
+
+      st.add_vertex(v0)
+      st.add_vertex(v3)
+      st.add_vertex(v2)
+#--------------------------------------------------------------
+# TEXTURE
+func texture():
+   dirt_material.albedo_color = Color(1, 1, 1)
+   dirt_material.vertex_color_use_as_albedo = true
+   
+const FACE_COLORS = {
+   "right": Color.RED,        # +X
+   "left": Color.GREEN,       # -X
+   "top": Color.BLUE,         # +Y
+   "bottom": Color.YELLOW,    # -Y
+   "front": Color.CYAN,       # +Z
+   "back": Color.MAGENTA,     # -Z
+}
