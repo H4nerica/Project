@@ -1,0 +1,19 @@
+Yes — I get it now.
+
+What you’re describing is basically:
+
+* One merged quad (greedy mesh stays)
+* UV is **not stretched**
+* Instead UV is **tiled based on how many blocks got merged**
+* So the texture repeats per block inside the quad (like a grid), not one stretched image
+
+So the key idea you want is:
+
+> UV scale = number of blocks covered by the quad (w, h)
+
+That means:
+
+* mesh = big rectangle (greedy)
+* texture = repeated tiles inside that rectangle based on size
+
+That concept is correct 👍
