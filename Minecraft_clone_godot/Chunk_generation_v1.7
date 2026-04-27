@@ -1,0 +1,466 @@
+extends Node3D
+
+#--------------------------------------------------------------
+# CHUNK
+var world_size_x = 10
+var world_size_y = 1
+var world_size_z = 10
+var world_blocks = {}
+
+var chunks_per_frame = 1
+var chunks_to_generate = []
+var Chunk_SIZE = 16
+var current_chunk_index = 0
+
+#processing
+var active_threads = []
+
+#Noise, terrain, biome
+var noise = FastNoiseLite.new()
+
+#chunk saving
+var dirty_chunks = {}
+var save_data = {}
+	
+#--------------------------------------------------------------
+#BLOCK INFORMATION
+#--------------------------------------------------------------
+var place_this_block
+
+#DICTIONARY OF BLOCKS
+var BLOCKS = {
+	0: { "name": "AIR", "texture": null, "atlas": Vector2(-1, -1) },
+
+	1: {
+		"name": "DIRT",
+		"texture": "res://Assets/Dirt.png",
+		"atlas": Vector2(0, 0)
+	},
+
+	2: {
+		"name": "STONE",
+		"texture": "res://Assets/Stone.png",
+		"atlas": Vector2(1, 0)
+	},
+
+	3: {
+		"name": "WATU",
+		"texture": "res://Assets/Watu.png",
+		"atlas": Vector2(0, 1)
+	}
+}
+
+# BLOCK ID
+const AIR   = 0
+const DIRT = 1
+const STONE = 2
+const WATU = 3
+
+#DATA
+class ChunkData:
+	var blocks = {}
+	
+#--------------------------------------------------------------	
+#TEXTURE
+var atlas_image : Image
+var atlas_texture : ImageTexture
+var TILE_SIZE_IN_PIXEL = 6
+var ATLAS_SIZE : Vector2i
+
+#--------------------------------------------------------------
+# MESH DATA
+#--------------------------------------------------------------
+var default_block_color := StandardMaterial3D.new()
+
+# 6 face directions
+const FACES = [
+	# +X
+	{"name": "right", "dir": Vector3(1,0,0), "verts": [
+		Vector3(1,0,0), Vector3(1,1,0), Vector3(1,1,1), Vector3(1,0,1)
+	]},
+
+	# -X
+	{"name": "left", "dir": Vector3(-1,0,0), "verts": [
+		Vector3(0,0,1), Vector3(0,1,1), Vector3(0,1,0), Vector3(0,0,0)
+	]},
+
+	# +Y (TOP)
+	{"name": "top", "dir": Vector3(0,1,0), "verts": [
+		Vector3(0,1,0), Vector3(0,1,1), Vector3(1,1,1), Vector3(1,1,0)
+	]},
+
+	# -Y (BOTTOM)
+	{"name": "bottom", "dir": Vector3(0,-1,0), "verts": [
+		Vector3(0,0,1), Vector3(0,0,0), Vector3(1,0,0), Vector3(1,0,1)
+	]},
+
+	# +Z (FRONT)
+	{"name": "front", "dir": Vector3(0,0,1), "verts": [
+		Vector3(0,0,1), Vector3(1,0,1), Vector3(1,1,1), Vector3(0,1,1)
+	]},
+
+	# -Z (BACK)
+	{"name": "back", "dir": Vector3(0,0,-1), "verts": [
+		Vector3(1,0,0), Vector3(0,0,0), Vector3(0,1,0), Vector3(1,1,0)
+	]},
+]
+
+#--------------------------------------------------------------
+# UI STUFF
+#--------------------------------------------------------------
+@onready var player_camera = $Player_CAMERA
+@onready var hud_debug = $HUD_Debug
+
+
+#--------------------------------------------------------------
+#update once on start
+#--------------------------------------------------------------
+func _ready():
+	spawn_player()
+	texture() #give texture
+	
+	for z in range(world_size_z):
+		for y in range(world_size_y):
+			for x in range(world_size_x):
+				chunks_to_generate.append(Vector3(x, y, z))
+				
+#--------------------------------------------------------------
+#update per frame
+#--------------------------------------------------------------
+func _process(delta):
+	get_hud_debug()
+	# --- START NEW CHUNKS (non-blocking) ---
+	for i in range(chunks_per_frame):
+		if current_chunk_index >= chunks_to_generate.size():
+			break
+
+		var chunk_pos = chunks_to_generate[current_chunk_index]
+		generate_one_chunk(chunk_pos)
+		current_chunk_index += 1
+
+	# --- FINISH THREADS (async completion) ---
+	for t in active_threads:
+		var thread = t.thread
+
+		if thread.is_started() and not thread.is_alive():
+			thread.wait_to_finish()
+
+			var st = t.payload.result
+			var chunk = t.payload.chunk_node
+
+			var mesh = st.commit()
+			var mi = MeshInstance3D.new()
+			mi.mesh = mesh
+			chunk.add_child(mi)
+
+			active_threads.erase(t)
+			break
+	
+
+#--------------------------------------------------------------
+# CHUNK DATA
+#--------------------------------------------------------------
+func generate_one_chunk(chunk_pos):
+
+	var chunk = Node3D.new()
+	add_child(chunk)
+	chunk.position = chunk_pos * Chunk_SIZE
+
+	# block data (same as before)
+	var block_position_index = []
+	var chunk_data = ChunkData.new()
+	var size = Chunk_SIZE * Chunk_SIZE * Chunk_SIZE
+	block_position_index.resize(size)
+
+	for z in range(Chunk_SIZE):
+		for y in range(Chunk_SIZE):
+			for x in range(Chunk_SIZE):
+				var i = x + y * Chunk_SIZE + z * Chunk_SIZE * Chunk_SIZE
+				var world_x = chunk_pos.x * Chunk_SIZE + x
+				var world_y = chunk_pos.y * Chunk_SIZE + y
+				var world_z = chunk_pos.z * Chunk_SIZE + z
+
+				var key = Vector3i(world_x, world_y, world_z)
+				
+				#spawn this block
+				var block_type = terrain_or_what_being_placed(world_x, world_y, world_z)
+				if block_type != AIR:
+					chunk_data.blocks[Vector3i(x, y, z)] = block_type
+				block_position_index[i] = block_type
+				
+				#tell me what is at 1 1 1 xyz
+				if world_x == 1 and world_y == 1 and world_z == 1:
+					print("BLOCK AT (1,1,1) =", block_type)
+
+	# STORE IT HERE
+	world_blocks[chunk_pos] = chunk_data
+	# -------------------------------
+	# START THREAD
+	var thread = Thread.new()
+
+	var payload = {
+		"data": chunk_data,
+		"chunk_pos": chunk_pos,
+		"chunk_node": chunk
+	}
+
+	var err = thread.start(Callable(self, "_generate_chunk_mesh").bind(payload))
+
+	if err != OK:
+		push_error("THREAD FAILED")
+		return
+
+	active_threads.append({
+		"thread": thread,
+		"payload": payload
+	})
+
+func _generate_chunk_mesh(payload):
+	var data = payload.data
+	var chunk_pos = payload.chunk_pos
+	var st = SurfaceTool.new()
+	
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# pick ONE material per mesh
+	st.set_material(default_block_color)
+
+	for z in range(Chunk_SIZE):
+		for y in range(Chunk_SIZE):
+			for x in range(Chunk_SIZE):
+
+				var local_pos = Vector3i(x, y, z)
+
+				if not data.blocks.has(local_pos):
+					continue
+
+				var block_type = data.blocks[local_pos]
+
+				_build_cube_chunk(st, x, y, z, data, chunk_pos, block_type)
+
+	payload["result"] = st
+
+#-----------------------------------------------------------------
+#Noise or biome or terrain in here
+#-----------------------------------------------------------------
+func terrain_or_what_being_placed(world_x, world_y, world_z):
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.frequency = 0.05
+
+	var height_value = noise.get_noise_2d(world_x, world_z)
+
+	# convert from -1..1 → 0..1
+	height_value = (height_value + 1.0) * 0.5
+
+	var max_height = 10
+	var terrain_height = int(height_value * max_height)
+	
+	# 1) check first so it correct, basically bedrock
+	if world_y == 0:
+		return WATU
+	# 2) terrain
+	if world_y < terrain_height:
+		return DIRT
+	# 3) empty space
+	return AIR
+	
+#--------------------------------------------------------------
+# MESH GENERATION
+func _build_cube_chunk(st, x, y, z, data, chunk_pos, block_type):
+	var tile = get_block_atlas(block_type)
+	var tile_size = Vector2(1.0 / ATLAS_SIZE.x, 1.0 / ATLAS_SIZE.y)
+	var offset = tile * tile_size
+	
+	for face in FACES:
+		var direction = face.dir
+
+		var local = Vector3i(x, y, z) + Vector3i(direction)
+
+		# check neighbor inside SAME chunk
+		if local.x >= 0 and local.x < Chunk_SIZE \
+		and local.y >= 0 and local.y < Chunk_SIZE \
+		and local.z >= 0 and local.z < Chunk_SIZE:
+
+			if data.blocks.get(local, AIR) != AIR:
+				continue
+
+		var v = face.verts
+
+		var v0 = Vector3(x, y, z) + v[0]
+		var v1 = Vector3(x, y, z) + v[1]
+		var v2 = Vector3(x, y, z) + v[2]
+		var v3 = Vector3(x, y, z) + v[3]
+
+		st.set_uv(offset + Vector2(0, 0) * tile_size)
+		st.add_vertex(v0)
+
+		st.set_uv(offset + Vector2(1, 1) * tile_size)
+		st.add_vertex(v2)
+
+		st.set_uv(offset + Vector2(1, 0) * tile_size)
+		st.add_vertex(v1)
+
+
+		st.set_uv(offset + Vector2(0, 0) * tile_size)
+		st.add_vertex(v0)
+
+		st.set_uv(offset + Vector2(0, 1) * tile_size)
+		st.add_vertex(v3)
+
+		st.set_uv(offset + Vector2(1, 1) * tile_size)
+		st.add_vertex(v2)
+		
+#--------------------------------------------------------------
+# TEXTURE
+#--------------------------------------------------------------
+func get_atlas_size() -> Vector2i:
+	var max_x = 0
+	var max_y = 0
+
+	for id in BLOCKS:
+		var atlas_pos = BLOCKS[id]["atlas"]
+
+		if atlas_pos.x < 0 or atlas_pos.y < 0:
+			continue
+
+		if atlas_pos.x > max_x:
+			max_x = atlas_pos.x
+
+		if atlas_pos.y > max_y:
+			max_y = atlas_pos.y
+
+	return Vector2i(max_x + 1, max_y + 1)
+	
+func texture():
+	#Automatically set atlas size and position
+	ATLAS_SIZE = get_atlas_size()
+	var width = ATLAS_SIZE.x * TILE_SIZE_IN_PIXEL
+	var height = ATLAS_SIZE.y * TILE_SIZE_IN_PIXEL
+	atlas_image = Image.create(width, height, false, Image.FORMAT_RGBA8)
+	
+	#for each id that is in BLOCKS make their own path then using it. instead of manually
+	for id in BLOCKS.keys():
+		var tex_path = BLOCKS[id]["texture"]
+		if tex_path == null:
+			continue
+
+		var img = load(tex_path).get_image()
+		var atlas_pos = BLOCKS[id]["atlas"] * TILE_SIZE_IN_PIXEL
+
+		atlas_image.blit_rect(img, Rect2(0,0,TILE_SIZE_IN_PIXEL,TILE_SIZE_IN_PIXEL), atlas_pos)
+
+	atlas_texture = ImageTexture.create_from_image(atlas_image)
+
+	default_block_color = StandardMaterial3D.new()
+	default_block_color.albedo_texture = atlas_texture
+	default_block_color.vertex_color_use_as_albedo = false
+	default_block_color.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+
+#--------------------------------------------------------------
+# BLOCK STUFF	
+func get_block_chunk(x, y, z, data):
+	if x < 0 or y < 0 or z < 0:
+		return AIR
+	if x >= Chunk_SIZE or y >= Chunk_SIZE or z >= Chunk_SIZE:
+		return AIR
+
+	var i = x + y * Chunk_SIZE + z * Chunk_SIZE * Chunk_SIZE
+	return data[i]
+func get_block_atlas(block_type):
+	return BLOCKS[block_type].get("atlas", Vector2(-1, -1))
+
+#-----------------------------------------------------------------
+# SAVE AND LOAD
+#-----------------------------------------------------------------
+func save_world():
+	save_data.clear()
+	for chunk_pos in world_blocks.keys():
+		var chunk_data = world_blocks[chunk_pos]
+		var blocks = {}
+
+		for pos in chunk_data.blocks.keys():
+			var id = chunk_data.blocks[pos]
+			if id == AIR:
+				continue
+
+			blocks[for_saving_helper(pos)] = id 
+		save_data[for_saving_helper_chunk(chunk_pos)] = blocks
+
+	var file = FileAccess.open("user://world.json", FileAccess.WRITE)
+	file.store_string(JSON.stringify(save_data))
+	file.close()
+
+	dirty_chunks.clear()
+	
+func load_world():
+	var file = FileAccess.open("user://world.json", FileAccess.READ)
+	if file == null:
+		return
+
+	var raw = file.get_as_text()
+	var data = JSON.parse_string(raw)
+	if data == null:
+		return
+
+	world_blocks.clear()
+
+	for chunk_key in data.keys():
+		# "x,y,z" -> Vector3i
+		var cleaned = chunk_key.replace("chunk_", "")
+		var c = cleaned.split("_")
+		var chunk_pos = Vector3i(int(c[0]), int(c[1]), int(c[2]))
+
+		var chunk_data = ChunkData.new()
+
+		var blocks = data[chunk_key]
+
+		for block_key in blocks.keys():
+			# "x,y,z" -> Vector3i
+			var b = block_key.split(",")
+			var local_pos = Vector3i(int(b[0]), int(b[1]), int(b[2]))
+
+			chunk_data.blocks[local_pos] = blocks[block_key]
+
+		world_blocks[chunk_pos] = chunk_data
+
+	# rebuild world visuals
+	for chunk_pos in world_blocks.keys():
+		generate_one_chunk(chunk_pos)
+
+#-----------------------------------------------------------------
+# INPUT
+#-----------------------------------------------------------------	
+func _input(event):
+	if event.is_action_pressed("ui_save"):
+		save_world()
+	if event.is_action_pressed("ui_load"):
+		load_world()
+
+#-----------------------------------------------------------------
+#helper
+#-----------------------------------------------------------------
+func for_saving_helper(v: Vector3) -> String:
+	return str(v.x) + "," + str(v.y) + "," + str(v.z)
+
+func for_saving_helper_chunk(v: Vector3) -> String:
+	return "chunk_" + str(v.x) + "_" + str(v.y) + "_" + str(v.z)
+
+func get_hud_debug():
+	var fps = Engine.get_frames_per_second()
+	
+	var world_pos = player_camera.global_transform.origin
+	var current_block = Vector3i(
+		floor(world_pos.x),
+		floor(world_pos.y),
+		floor(world_pos.z)
+	)
+	hud_debug.text = "FPS: " + str(fps) + "\nPOS: " + str(current_block)
+	
+func spawn_player():
+	var spawn_block = Vector3i(0, 10, 0)
+	var spawn_pos = Vector3(
+		spawn_block.x + 0.5,
+		spawn_block.y + 0.5,
+		spawn_block.z + 0.5
+	)
+
+	player_camera.global_transform.origin = spawn_pos
