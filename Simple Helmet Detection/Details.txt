@@ -1,0 +1,1 @@
+This is a simple app build for detecting an object using simple algorithm for my univ project. Which using no library and using Godot Engine as a base.
